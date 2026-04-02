@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies
+        run: cd web && npm ci
+
+      - name: Frontend type-check
+        run: cd web && npm run typecheck
+
+      - name: Frontend lint
+        run: cd web && npm run lint
+
+      - name: Frontend format check
+        run: cd web && npm run format:check
+
+      - name: Build frontend
+        run: cd web && npm run build
+
+      - name: Go test
+        run: CGO_ENABLED=1 go test -tags nobpf -v ./tests/...
+
+      - name: Go build
+        run: CGO_ENABLED=1 go build -tags nobpf ./cmd/co11yctor
+
+      - name: Go vet
+        run: go vet -tags nobpf ./...

@@ -10,6 +10,10 @@ internal/capture/otlpcapture_*.o
 # Go test cache
 *.test
 
+# Frontend
+web/node_modules/
+web/dist/
+
 # OS / editor
 .DS_Store
 .idea/

@@ -16,6 +16,13 @@ type Stats struct {
 	NewestRecord time.Time
 }
 
+// ServiceEdge represents a dependency between two services.
+type ServiceEdge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Count  int    `json:"count"`
+}
+
 // Storage defines the interface for telemetry persistence.
 type Storage interface {
 	InsertSpan(ctx context.Context, span otlp.Span) error
@@ -31,6 +38,8 @@ type Storage interface {
 	GetRecentLogs(ctx context.Context, limit int) ([]otlp.LogRecord, error)
 
 	GetStats(ctx context.Context) (*Stats, error)
+	GetServices(ctx context.Context) ([]string, error)
+	GetServiceEdges(ctx context.Context) ([]ServiceEdge, error)
 	StreamChan() <-chan interface{}
 	Close() error
 }

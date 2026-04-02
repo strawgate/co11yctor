@@ -276,6 +276,62 @@ func (d *DuckDB) GetStats(ctx context.Context) (*Stats, error) {
 	return stats, nil
 }
 
+func (d *DuckDB) GetServices(ctx context.Context) ([]string, error) {
+	q := `SELECT DISTINCT service_name FROM (
+		SELECT service_name FROM spans WHERE service_name != ''
+		UNION
+		SELECT service_name FROM metrics WHERE service_name != ''
+		UNION
+		SELECT service_name FROM logs WHERE service_name != ''
+	) ORDER BY service_name`
+
+	rows, err := d.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var services []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		services = append(services, name)
+	}
+	return services, rows.Err()
+}
+
+func (d *DuckDB) GetServiceEdges(ctx context.Context) ([]ServiceEdge, error) {
+	// Build service dependency edges from parent-child span relationships
+	q := `SELECT
+		p.service_name AS source,
+		c.service_name AS target,
+		COUNT(*) AS cnt
+	FROM spans c
+	JOIN spans p ON c.parent_span_id = p.span_id AND c.trace_id = p.trace_id
+	WHERE c.service_name != '' AND p.service_name != '' AND c.service_name != p.service_name
+	GROUP BY source, target
+	ORDER BY cnt DESC
+	LIMIT 100`
+
+	rows, err := d.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var edges []ServiceEdge
+	for rows.Next() {
+		var e ServiceEdge
+		if err := rows.Scan(&e.Source, &e.Target, &e.Count); err != nil {
+			return nil, err
+		}
+		edges = append(edges, e)
+	}
+	return edges, rows.Err()
+}
+
 func (d *DuckDB) StreamChan() <-chan interface{} {
 	return d.stream
 }

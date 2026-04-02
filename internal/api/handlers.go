@@ -13,13 +13,35 @@ subFS, err := fs.Sub(staticFiles, "static")
 if err != nil {
 log.Fatalf("static files: %v", err)
 }
-mux.Handle("/", http.FileServer(http.FS(subFS)))
 
 mux.HandleFunc("/api/spans", s.handleSpans)
 mux.HandleFunc("/api/metrics", s.handleMetrics)
 mux.HandleFunc("/api/logs", s.handleLogs)
 mux.HandleFunc("/api/stats", s.handleStats)
+mux.HandleFunc("/api/services", s.handleServices)
+mux.HandleFunc("/api/service-map", s.handleServiceMap)
 mux.HandleFunc("/ws", s.handleWebSocket)
+
+// SPA fallback: serve index.html for non-API, non-asset routes
+fileServer := http.FileServer(http.FS(subFS))
+mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	// Try to serve static file first
+	path := r.URL.Path
+	if path == "/" {
+		fileServer.ServeHTTP(w, r)
+		return
+	}
+	// Check if static file exists
+	f, err := subFS.Open(path[1:]) // strip leading /
+	if err == nil {
+		f.Close()
+		fileServer.ServeHTTP(w, r)
+		return
+	}
+	// SPA fallback: serve index.html for client-side routes
+	r.URL.Path = "/"
+	fileServer.ServeHTTP(w, r)
+})
 }
 
 func limit(r *http.Request, def int) int {
@@ -39,6 +61,23 @@ log.Printf("api: encode response: %v", err)
 }
 
 func (s *Server) handleSpans(w http.ResponseWriter, r *http.Request) {
+traceID := r.URL.Query().Get("trace_id")
+filter := r.URL.Query().Get("filter")
+
+if traceID != "" {
+	filter = "trace_id = '" + traceID + "'"
+}
+
+if filter != "" {
+	spans, err := s.store.QuerySpans(r.Context(), filter, limit(r, 100))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, spans)
+	return
+}
+
 spans, err := s.store.GetRecentSpans(r.Context(), limit(r, 100))
 if err != nil {
 http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -48,6 +87,18 @@ writeJSON(w, spans)
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+filter := r.URL.Query().Get("filter")
+
+if filter != "" {
+	metrics, err := s.store.QueryMetrics(r.Context(), filter, limit(r, 100))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, metrics)
+	return
+}
+
 metrics, err := s.store.GetRecentMetrics(r.Context(), limit(r, 100))
 if err != nil {
 http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -57,6 +108,18 @@ writeJSON(w, metrics)
 }
 
 func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
+filter := r.URL.Query().Get("filter")
+
+if filter != "" {
+	logs, err := s.store.QueryLogs(r.Context(), filter, limit(r, 100))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, logs)
+	return
+}
+
 logs, err := s.store.GetRecentLogs(r.Context(), limit(r, 100))
 if err != nil {
 http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -72,6 +135,31 @@ http.Error(w, err.Error(), http.StatusInternalServerError)
 return
 }
 writeJSON(w, stats)
+}
+
+func (s *Server) handleServices(w http.ResponseWriter, r *http.Request) {
+services, err := s.store.GetServices(r.Context())
+if err != nil {
+http.Error(w, err.Error(), http.StatusInternalServerError)
+return
+}
+writeJSON(w, services)
+}
+
+// ServiceEdge represents a dependency between services.
+type ServiceEdge struct {
+Source string `json:"source"`
+Target string `json:"target"`
+Count  int    `json:"count"`
+}
+
+func (s *Server) handleServiceMap(w http.ResponseWriter, r *http.Request) {
+edges, err := s.store.GetServiceEdges(r.Context())
+if err != nil {
+http.Error(w, err.Error(), http.StatusInternalServerError)
+return
+}
+writeJSON(w, edges)
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
