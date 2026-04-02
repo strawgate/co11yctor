@@ -1,0 +1,17 @@
+# Build artifacts
+co11yctor
+*.db
+*.db.wal
+
+# eBPF generated Go bindings
+internal/capture/otlpcapture_*.go
+internal/capture/otlpcapture_*.o
+
+# Go test cache
+*.test
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

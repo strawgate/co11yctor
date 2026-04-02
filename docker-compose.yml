@@ -10,4 +10,4 @@ services:
       - DB_PATH=/data/co11yctor.db
     ports:
       - "8080:8080"
-    command: ["co11yctor", "--db", "/data/co11yctor.db", "--port", "8080"]
+    command: ["--db", "/data/co11yctor.db", "--port", "8080", "--no-ebpf"]

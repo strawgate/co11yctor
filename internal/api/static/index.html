@@ -4,143 +4,193 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>co11yctor — OTLP Observability</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: { DEFAULT: '#6366f1', dark: '#4f46e5' }
-          }
-        }
-      }
-    }
-  </script>
   <style>
-    body { background: #0f172a; color: #e2e8f0; }
-    .tab-active { background: #6366f1; color: #fff; }
-    .tab-inactive { background: #1e293b; color: #94a3b8; }
-    .tab-inactive:hover { background: #334155; color: #e2e8f0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { background: #0f172a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.5; }
+
+    /* layout */
+    header { border-bottom: 1px solid #334155; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+    nav { padding: 16px 24px 0; display: flex; gap: 8px; }
+    main { padding: 0 24px 24px; }
+    .card { background: #1e293b; border-radius: 0 8px 8px 8px; padding: 16px; min-height: 400px; }
+
+    /* header */
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo { font-size: 1.5rem; }
+    h1 { font-size: 1.25rem; font-weight: 700; color: #818cf8; }
+    .tagline { font-size: 0.75rem; color: #64748b; }
+    .header-right { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; color: #94a3b8; }
+    .divider { color: #475569; margin: 0 8px; }
+
+    /* tabs */
+    button.tab { border: none; cursor: pointer; padding: 8px 16px; border-radius: 6px 6px 0 0; font-size: 0.875rem; font-weight: 500; transition: background 0.15s; }
+    button.tab-active { background: #6366f1; color: #fff; }
+    button.tab-inactive { background: #1e293b; color: #94a3b8; }
+    button.tab-inactive:hover { background: #334155; color: #e2e8f0; }
+
+    /* action buttons */
+    button.action-btn { border: 1px solid #475569; background: transparent; color: #94a3b8; cursor: pointer; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; }
+    button.action-btn:hover { color: #e2e8f0; border-color: #64748b; }
+
+    /* tab panels */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* tables */
+    .table-wrap { overflow-x: auto; border-radius: 6px; }
     table { width: 100%; border-collapse: collapse; }
-    th { background: #1e293b; padding: 8px 12px; text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
-    td { padding: 8px 12px; border-bottom: 1px solid #1e293b; font-size: 0.875rem; }
-    tr:hover td { background: #1e293b; }
+    th { background: #0f172a; padding: 8px 12px; text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; white-space: nowrap; }
+    td { padding: 8px 12px; border-bottom: 1px solid #1e293b; font-size: 0.85rem; }
+    tr:hover td { background: #0f172a; }
+    .empty-row td { color: #475569; text-align: center; padding: 40px 0; }
+
+    /* badges */
+    .badge { font-size: 0.7rem; border-radius: 4px; padding: 1px 6px; font-family: monospace; }
     .badge-grpc { background: #312e81; color: #a5b4fc; }
     .badge-http { background: #1e3a5f; color: #7dd3fc; }
     .badge-ok   { background: #14532d; color: #86efac; }
     .badge-err  { background: #7f1d1d; color: #fca5a5; }
-    #live-stream { max-height: 600px; overflow-y: auto; }
-    .stream-item { padding: 8px 12px; border-bottom: 1px solid #1e293b; font-family: monospace; font-size: 0.8rem; animation: fadeIn 0.3s; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-    .ws-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .ws-connected { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+    .badge-info { background: #1e3a5f; color: #7dd3fc; }
+    .badge-warn { background: #451a03; color: #fdba74; }
+
+    /* live stream */
+    #live-stream { max-height: 580px; overflow-y: auto; border-radius: 6px; background: #0f172a; }
+    .stream-item { padding: 7px 12px; border-bottom: 1px solid #1e293b; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.78rem; animation: fadeIn 0.25s ease; }
+    .stream-item:last-child { border-bottom: none; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+    .stream-placeholder { padding: 20px; color: #475569; font-size: 0.875rem; }
+
+    /* color helpers */
+    .c-indigo  { color: #818cf8; }
+    .c-cyan    { color: #22d3ee; }
+    .c-emerald { color: #34d399; }
+    .c-white   { color: #f1f5f9; }
+    .c-muted   { color: #64748b; }
+    .c-slate   { color: #94a3b8; }
+    .mono      { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.78rem; }
+
+    /* stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 4px; }
+    .stat-card { background: #0f172a; border-radius: 8px; padding: 20px; text-align: center; }
+    .stat-num { font-size: 2rem; font-weight: 700; }
+    .stat-label { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+
+    /* ws indicator */
+    .ws-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; vertical-align: middle; }
+    .ws-connected    { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
     .ws-disconnected { background: #ef4444; }
+
+    /* section header row */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .section-title { font-size: 0.875rem; font-weight: 600; color: #cbd5e1; }
   </style>
 </head>
-<body class="min-h-screen">
-  <header class="border-b border-slate-700 px-6 py-4 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <span class="text-2xl">🔭</span>
-      <h1 class="text-xl font-bold text-indigo-400">co11yctor</h1>
-      <span class="text-xs text-slate-500">eBPF OTLP Observer</span>
+<body>
+  <header>
+    <div class="header-left">
+      <span class="logo">🔭</span>
+      <h1>co11yctor</h1>
+      <span class="tagline">eBPF OTLP Observer</span>
     </div>
-    <div class="flex items-center gap-2 text-sm text-slate-400">
+    <div class="header-right">
       <span class="ws-dot ws-disconnected" id="ws-dot"></span>
       <span id="ws-status">Connecting…</span>
-      <span class="ml-4 text-slate-600">|</span>
-      <span id="stats-summary" class="ml-4 text-slate-400">—</span>
+      <span class="divider">|</span>
+      <span id="stats-summary" class="c-muted">—</span>
     </div>
   </header>
 
-  <nav class="px-6 pt-4 flex gap-2">
-    <button class="tab-active px-4 py-2 rounded-t text-sm font-medium" onclick="switchTab('live')">⚡ Live Stream</button>
-    <button class="tab-inactive px-4 py-2 rounded-t text-sm font-medium" onclick="switchTab('spans')">🔗 Spans</button>
-    <button class="tab-inactive px-4 py-2 rounded-t text-sm font-medium" onclick="switchTab('metrics')">📊 Metrics</button>
-    <button class="tab-inactive px-4 py-2 rounded-t text-sm font-medium" onclick="switchTab('logs')">📋 Logs</button>
-    <button class="tab-inactive px-4 py-2 rounded-t text-sm font-medium" onclick="switchTab('stats')">📈 Stats</button>
+  <nav>
+    <button class="tab tab-active"   onclick="switchTab('live')">⚡ Live Stream</button>
+    <button class="tab tab-inactive" onclick="switchTab('spans')">🔗 Spans</button>
+    <button class="tab tab-inactive" onclick="switchTab('metrics')">📊 Metrics</button>
+    <button class="tab tab-inactive" onclick="switchTab('logs')">📋 Logs</button>
+    <button class="tab tab-inactive" onclick="switchTab('stats')">📈 Stats</button>
   </nav>
 
-  <main class="px-6 pb-6">
-    <div class="bg-slate-800 rounded-b rounded-tr p-4" style="min-height:400px">
+  <main>
+    <div class="card">
 
-      <!-- Live Stream Tab -->
-      <div id="tab-live">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-semibold text-slate-300">Real-time telemetry stream</h2>
-          <button onclick="clearStream()" class="text-xs text-slate-500 hover:text-slate-300 border border-slate-600 rounded px-2 py-1">Clear</button>
+      <!-- Live Stream -->
+      <div id="tab-live" class="tab-panel active">
+        <div class="section-header">
+          <span class="section-title">Real-time telemetry stream</span>
+          <button class="action-btn" onclick="clearStream()">Clear</button>
         </div>
-        <div id="live-stream" class="rounded bg-slate-900">
-          <div class="p-4 text-slate-500 text-sm">Waiting for events…</div>
+        <div id="live-stream">
+          <div class="stream-placeholder">Waiting for events…</div>
         </div>
       </div>
 
-      <!-- Spans Tab -->
-      <div id="tab-spans" class="hidden">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-semibold text-slate-300">Captured Spans</h2>
-          <button onclick="loadSpans()" class="text-xs text-slate-500 hover:text-slate-300 border border-slate-600 rounded px-2 py-1">↻ Refresh</button>
+      <!-- Spans -->
+      <div id="tab-spans" class="tab-panel">
+        <div class="section-header">
+          <span class="section-title">Captured Spans</span>
+          <button class="action-btn" onclick="loadSpans()">↻ Refresh</button>
         </div>
-        <div class="overflow-x-auto rounded">
-          <table id="spans-table">
+        <div class="table-wrap">
+          <table>
             <thead><tr>
               <th>Service</th><th>Name</th><th>Trace ID</th><th>Duration</th><th>Status</th><th>Proto</th><th>Captured</th>
             </tr></thead>
-            <tbody id="spans-body"><tr><td colspan="7" class="text-slate-500 text-center py-8">Loading…</td></tr></tbody>
+            <tbody id="spans-body"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
 
-      <!-- Metrics Tab -->
-      <div id="tab-metrics" class="hidden">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-semibold text-slate-300">Captured Metrics</h2>
-          <button onclick="loadMetrics()" class="text-xs text-slate-500 hover:text-slate-300 border border-slate-600 rounded px-2 py-1">↻ Refresh</button>
+      <!-- Metrics -->
+      <div id="tab-metrics" class="tab-panel">
+        <div class="section-header">
+          <span class="section-title">Captured Metrics</span>
+          <button class="action-btn" onclick="loadMetrics()">↻ Refresh</button>
         </div>
-        <div class="overflow-x-auto rounded">
-          <table id="metrics-table">
+        <div class="table-wrap">
+          <table>
             <thead><tr>
               <th>Service</th><th>Name</th><th>Type</th><th>Value</th><th>Unit</th><th>Proto</th><th>Captured</th>
             </tr></thead>
-            <tbody id="metrics-body"><tr><td colspan="7" class="text-slate-500 text-center py-8">Loading…</td></tr></tbody>
+            <tbody id="metrics-body"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
 
-      <!-- Logs Tab -->
-      <div id="tab-logs" class="hidden">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-semibold text-slate-300">Captured Logs</h2>
-          <button onclick="loadLogs()" class="text-xs text-slate-500 hover:text-slate-300 border border-slate-600 rounded px-2 py-1">↻ Refresh</button>
+      <!-- Logs -->
+      <div id="tab-logs" class="tab-panel">
+        <div class="section-header">
+          <span class="section-title">Captured Logs</span>
+          <button class="action-btn" onclick="loadLogs()">↻ Refresh</button>
         </div>
-        <div class="overflow-x-auto rounded">
-          <table id="logs-table">
+        <div class="table-wrap">
+          <table>
             <thead><tr>
               <th>Service</th><th>Severity</th><th>Body</th><th>Trace ID</th><th>Proto</th><th>Captured</th>
             </tr></thead>
-            <tbody id="logs-body"><tr><td colspan="6" class="text-slate-500 text-center py-8">Loading…</td></tr></tbody>
+            <tbody id="logs-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
 
-      <!-- Stats Tab -->
-      <div id="tab-stats" class="hidden">
-        <h2 class="text-sm font-semibold text-slate-300 mb-4">Database Statistics</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="stats-cards">
-          <div class="bg-slate-900 rounded p-4 text-center">
-            <div class="text-3xl font-bold text-indigo-400" id="stat-spans">—</div>
-            <div class="text-sm text-slate-400 mt-1">Total Spans</div>
+      <!-- Stats -->
+      <div id="tab-stats" class="tab-panel">
+        <div class="section-header">
+          <span class="section-title">Database Statistics</span>
+          <button class="action-btn" onclick="loadStats()">↻ Refresh</button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-num c-indigo"  id="stat-spans">—</div>
+            <div class="stat-label">Total Spans</div>
           </div>
-          <div class="bg-slate-900 rounded p-4 text-center">
-            <div class="text-3xl font-bold text-cyan-400" id="stat-metrics">—</div>
-            <div class="text-sm text-slate-400 mt-1">Total Metrics</div>
+          <div class="stat-card">
+            <div class="stat-num c-cyan"    id="stat-metrics">—</div>
+            <div class="stat-label">Total Metrics</div>
           </div>
-          <div class="bg-slate-900 rounded p-4 text-center">
-            <div class="text-3xl font-bold text-emerald-400" id="stat-logs">—</div>
-            <div class="text-sm text-slate-400 mt-1">Total Logs</div>
+          <div class="stat-card">
+            <div class="stat-num c-emerald" id="stat-logs">—</div>
+            <div class="stat-label">Total Logs</div>
           </div>
         </div>
-        <button onclick="loadStats()" class="mt-4 text-xs text-slate-500 hover:text-slate-300 border border-slate-600 rounded px-2 py-1">↻ Refresh</button>
       </div>
 
     </div>
