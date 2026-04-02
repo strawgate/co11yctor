@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  co11yctor:
+    build: .
+    privileged: true
+    network_mode: host
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/co11yctor.db
+    ports:
+      - "8080:8080"
+    command: ["co11yctor", "--db", "/data/co11yctor.db", "--port", "8080"]
