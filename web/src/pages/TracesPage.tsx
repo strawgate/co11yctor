@@ -153,9 +153,7 @@ function TraceDetail({ traceID, spans, onBack }: TraceDetailProps) {
           <div class="divide-y divide-slate-800">
             {sortedSpans.map((span, i) => {
               const left =
-                totalDuration > 0
-                  ? ((span.StartTimeUnixNano - minStart) / totalDuration) * 100
-                  : 0;
+                totalDuration > 0 ? ((span.StartTimeUnixNano - minStart) / totalDuration) * 100 : 0;
               const width =
                 totalDuration > 0
                   ? ((span.EndTimeUnixNano - span.StartTimeUnixNano) / totalDuration) * 100
@@ -202,26 +200,22 @@ function TraceDetail({ traceID, spans, onBack }: TraceDetailProps) {
               <DetailRow label="Parent ID" value={selectedSpan.ParentSpanID || "root"} mono />
               <DetailRow
                 label="Duration"
-                value={formatDuration(
-                  selectedSpan.StartTimeUnixNano,
-                  selectedSpan.EndTimeUnixNano,
-                )}
+                value={formatDuration(selectedSpan.StartTimeUnixNano, selectedSpan.EndTimeUnixNano)}
               />
               <DetailRow label="Status" value={selectedSpan.StatusCode === 1 ? "OK" : "Error"} />
               <DetailRow label="Source IP" value={selectedSpan.SourceIP} />
               <DetailRow label="Proto" value={selectedSpan.Proto} />
-              {selectedSpan.Attributes &&
-                Object.entries(selectedSpan.Attributes).length > 0 && (
-                  <div>
-                    <div class="text-slate-500 text-xs uppercase mb-1">Attributes</div>
-                    {Object.entries(selectedSpan.Attributes).map(([k, v]) => (
-                      <div key={k} class="flex gap-2 text-xs py-0.5">
-                        <span class="text-indigo-300">{k}:</span>
-                        <span class="text-slate-400">{v}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {selectedSpan.Attributes && Object.entries(selectedSpan.Attributes).length > 0 && (
+                <div>
+                  <div class="text-slate-500 text-xs uppercase mb-1">Attributes</div>
+                  {Object.entries(selectedSpan.Attributes).map(([k, v]) => (
+                    <div key={k} class="flex gap-2 text-xs py-0.5">
+                      <span class="text-indigo-300">{k}:</span>
+                      <span class="text-slate-400">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div class="p-4 text-sm text-slate-500 text-center">Click a span to see details</div>

@@ -31,9 +31,7 @@ export const LiveTailPage: FunctionComponent<Props> = ({ events, clearEvents }) 
 
       <div class="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden max-h-[calc(100vh-160px)] overflow-y-auto">
         {events.length === 0 ? (
-          <div class="px-4 py-12 text-center text-slate-500">
-            Waiting for events…
-          </div>
+          <div class="px-4 py-12 text-center text-slate-500">Waiting for events…</div>
         ) : (
           <div class="divide-y divide-slate-800/50">
             {events.map((event, i) => (
@@ -75,8 +73,7 @@ function StreamItem({ event }: { event: TelemetryEvent }) {
     content = JSON.stringify(event).slice(0, 100);
   }
 
-  const capturedAt =
-    "CapturedAt" in event ? formatTime((event as unknown as Span).CapturedAt) : "";
+  const capturedAt = "CapturedAt" in event ? formatTime((event as unknown as Span).CapturedAt) : "";
 
   return (
     <div class="px-4 py-2 font-mono text-xs stream-item-enter flex items-center gap-2">

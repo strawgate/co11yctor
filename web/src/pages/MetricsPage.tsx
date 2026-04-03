@@ -21,9 +21,7 @@ export const MetricsPage: FunctionComponent = () => {
     },
   );
 
-  const services = [
-    ...new Set((metrics || []).map((m) => m.ServiceName).filter(Boolean)),
-  ].sort();
+  const services = [...new Set((metrics || []).map((m) => m.ServiceName).filter(Boolean))].sort();
 
   const types = [...new Set((metrics || []).map((m) => m.DataType).filter(Boolean))].sort();
 

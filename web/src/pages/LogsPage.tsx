@@ -28,9 +28,9 @@ export const LogsPage: FunctionComponent<Props> = ({ events }) => {
   );
 
   // Live logs from websocket
-  const liveLogs = events
-    .filter((e) => e._type === "log")
-    .slice(0, 200) as (LogRecord & { _type: string })[];
+  const liveLogs = events.filter((e) => e._type === "log").slice(0, 200) as (LogRecord & {
+    _type: string;
+  })[];
 
   const logs = liveTail ? liveLogs : storedLogs || [];
 

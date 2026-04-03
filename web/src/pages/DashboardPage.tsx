@@ -31,9 +31,7 @@ export const DashboardPage: FunctionComponent<Props> = ({ events }) => {
     <div class="p-6 space-y-6">
       <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-slate-100">Dashboard</h1>
-        <span class="text-sm text-slate-500">
-          ~{recentCount} events/min
-        </span>
+        <span class="text-sm text-slate-500">~{recentCount} events/min</span>
       </div>
 
       {/* Stats Cards */}
@@ -41,11 +39,7 @@ export const DashboardPage: FunctionComponent<Props> = ({ events }) => {
         <StatCard label="Total Spans" value={stats?.TotalSpans ?? 0} color="indigo" />
         <StatCard label="Total Metrics" value={stats?.TotalMetrics ?? 0} color="cyan" />
         <StatCard label="Total Logs" value={stats?.TotalLogs ?? 0} color="emerald" />
-        <StatCard
-          label="Live Events"
-          value={events.length}
-          color="amber"
-        />
+        <StatCard label="Live Events" value={events.length} color="amber" />
       </div>
 
       {/* Recent Activity */}
@@ -57,9 +51,7 @@ export const DashboardPage: FunctionComponent<Props> = ({ events }) => {
           </div>
           <div class="divide-y divide-slate-800">
             {recentSpans.length === 0 ? (
-              <div class="px-4 py-8 text-center text-slate-500 text-sm">
-                Waiting for spans…
-              </div>
+              <div class="px-4 py-8 text-center text-slate-500 text-sm">Waiting for spans…</div>
             ) : (
               recentSpans.map((span, i) => (
                 <div key={i} class="px-4 py-2 flex items-center justify-between text-sm">
@@ -84,9 +76,7 @@ export const DashboardPage: FunctionComponent<Props> = ({ events }) => {
           </div>
           <div class="divide-y divide-slate-800">
             {recentLogs.length === 0 ? (
-              <div class="px-4 py-8 text-center text-slate-500 text-sm">
-                Waiting for logs…
-              </div>
+              <div class="px-4 py-8 text-center text-slate-500 text-sm">Waiting for logs…</div>
             ) : (
               recentLogs.map((log, i) => (
                 <div key={i} class="px-4 py-2 text-sm">

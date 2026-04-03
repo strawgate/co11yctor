@@ -20,9 +20,7 @@ export const ServicesPage: FunctionComponent = () => {
     <div class="p-6 space-y-6">
       <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-slate-100">Services</h1>
-        <span class="text-sm text-slate-500">
-          {services?.length ?? 0} services discovered
-        </span>
+        <span class="text-sm text-slate-500">{services?.length ?? 0} services discovered</span>
       </div>
 
       <div class="bg-slate-900 rounded-lg border border-slate-800 p-6 space-y-4">
@@ -67,7 +65,9 @@ export const ServicesPage: FunctionComponent = () => {
             </div>
 
             <div class="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-              <div class="text-xs uppercase tracking-wide text-slate-500 mb-4">Connected services</div>
+              <div class="text-xs uppercase tracking-wide text-slate-500 mb-4">
+                Connected services
+              </div>
               <div class="flex flex-wrap gap-2">
                 {(services || []).map((name) => (
                   <span
