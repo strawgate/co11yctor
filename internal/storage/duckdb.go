@@ -332,6 +332,57 @@ func (d *DuckDB) GetServiceEdges(ctx context.Context) ([]ServiceEdge, error) {
 	return edges, rows.Err()
 }
 
+func (d *DuckDB) GetDataSources(ctx context.Context) ([]DataSource, error) {
+	q := `SELECT
+		source_ip,
+		service_name,
+		SUM(span_count) AS span_count,
+		SUM(metric_count) AS metric_count,
+		SUM(log_count) AS log_count,
+		MAX(last_seen) AS last_seen
+	FROM (
+		SELECT source_ip, service_name, COUNT(*) AS span_count, 0 AS metric_count, 0 AS log_count, MAX(captured_at) AS last_seen
+		FROM spans
+		WHERE source_ip != '' AND service_name != ''
+		GROUP BY source_ip, service_name
+		UNION ALL
+		SELECT source_ip, service_name, 0 AS span_count, COUNT(*) AS metric_count, 0 AS log_count, MAX(captured_at) AS last_seen
+		FROM metrics
+		WHERE source_ip != '' AND service_name != ''
+		GROUP BY source_ip, service_name
+		UNION ALL
+		SELECT source_ip, service_name, 0 AS span_count, 0 AS metric_count, COUNT(*) AS log_count, MAX(captured_at) AS last_seen
+		FROM logs
+		WHERE source_ip != '' AND service_name != ''
+		GROUP BY source_ip, service_name
+	) grouped
+	GROUP BY source_ip, service_name
+	ORDER BY (SUM(span_count) + SUM(metric_count) + SUM(log_count)) DESC, source_ip, service_name`
+
+	rows, err := d.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sources []DataSource
+	for rows.Next() {
+		var source DataSource
+		if err := rows.Scan(
+			&source.SourceIP,
+			&source.ServiceName,
+			&source.SpanCount,
+			&source.MetricCount,
+			&source.LogCount,
+			&source.LastSeen,
+		); err != nil {
+			return nil, err
+		}
+		sources = append(sources, source)
+	}
+	return sources, rows.Err()
+}
+
 func (d *DuckDB) StreamChan() <-chan interface{} {
 	return d.stream
 }

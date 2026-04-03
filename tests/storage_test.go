@@ -158,3 +158,80 @@ func TestDuckDBGetServiceEdges(t *testing.T) {
 		t.Fatalf("unexpected edge: %#v", edges[0])
 	}
 }
+
+func TestDuckDBGetDataSources(t *testing.T) {
+	dbPath := "test_sources_co11yctor.db"
+	defer os.Remove(dbPath)
+
+	store, err := storage.NewDuckDB(dbPath)
+	if err != nil {
+		t.Fatalf("NewDuckDB: %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now()
+
+	if err := store.InsertSpan(ctx, otlp.Span{
+		TraceID:           "trace-source",
+		SpanID:            "span-source",
+		Name:              "request",
+		ServiceName:       "checkout",
+		StartTimeUnixNano: 100,
+		EndTimeUnixNano:   200,
+		StatusCode:        1,
+		CapturedAt:        now,
+		SourceIP:          "10.1.0.4",
+		Proto:             "grpc",
+		Attributes:        map[string]string{},
+	}); err != nil {
+		t.Fatalf("InsertSpan: %v", err)
+	}
+
+	if err := store.InsertMetric(ctx, otlp.Metric{
+		Name:        "http.server.duration",
+		ServiceName: "checkout",
+		DataType:    "histogram",
+		Value:       42,
+		CapturedAt:  now.Add(time.Second),
+		SourceIP:    "10.1.0.4",
+		Proto:       "grpc",
+		Attributes:  map[string]string{},
+	}); err != nil {
+		t.Fatalf("InsertMetric: %v", err)
+	}
+
+	if err := store.InsertLog(ctx, otlp.LogRecord{
+		Body:         "order received",
+		ServiceName:  "payments",
+		SeverityText: "INFO",
+		CapturedAt:   now.Add(2 * time.Second),
+		SourceIP:     "10.1.0.9",
+		Proto:        "http",
+		Attributes:   map[string]string{},
+	}); err != nil {
+		t.Fatalf("InsertLog: %v", err)
+	}
+
+	sources, err := store.GetDataSources(ctx)
+	if err != nil {
+		t.Fatalf("GetDataSources: %v", err)
+	}
+	if len(sources) != 2 {
+		t.Fatalf("expected 2 sources, got %d", len(sources))
+	}
+
+	if sources[0].SourceIP != "10.1.0.4" || sources[0].ServiceName != "checkout" {
+		t.Fatalf("unexpected first source: %#v", sources[0])
+	}
+	if sources[0].SpanCount != 1 || sources[0].MetricCount != 1 || sources[0].LogCount != 0 {
+		t.Fatalf("unexpected first source counts: %#v", sources[0])
+	}
+
+	if sources[1].SourceIP != "10.1.0.9" || sources[1].ServiceName != "payments" {
+		t.Fatalf("unexpected second source: %#v", sources[1])
+	}
+	if sources[1].SpanCount != 0 || sources[1].MetricCount != 0 || sources[1].LogCount != 1 {
+		t.Fatalf("unexpected second source counts: %#v", sources[1])
+	}
+}

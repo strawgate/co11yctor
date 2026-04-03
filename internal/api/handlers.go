@@ -21,6 +21,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/stats", s.handleStats)
 	mux.HandleFunc("/api/services", s.handleServices)
 	mux.HandleFunc("/api/service-map", s.handleServiceMap)
+	mux.HandleFunc("/api/data-sources", s.handleDataSources)
 	mux.HandleFunc("/ws", s.handleWebSocket)
 
 	// SPA fallback: serve index.html for non-API, non-asset routes
@@ -183,6 +184,15 @@ func (s *Server) handleServiceMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, edges)
+}
+
+func (s *Server) handleDataSources(w http.ResponseWriter, r *http.Request) {
+	sources, err := s.store.GetDataSources(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, sources)
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {

@@ -60,4 +60,13 @@ export interface ServiceInfo {
   lastSeen: string;
 }
 
+export interface DataSource {
+  sourceIp: string;
+  serviceName: string;
+  spanCount: number;
+  metricCount: number;
+  logCount: number;
+  lastSeen: string;
+}
+
 export type TelemetryEvent = (Span | Metric | LogRecord) & { _type: string };

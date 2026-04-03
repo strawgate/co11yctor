@@ -1,4 +1,4 @@
-import type { Span, Metric, LogRecord, Stats } from "./types";
+import type { DataSource, Span, Metric, LogRecord, Stats } from "./types";
 
 const BASE_URL = "";
 
@@ -72,4 +72,8 @@ export interface ServiceEdge {
 
 export function fetchServiceMap(): Promise<ServiceEdge[]> {
   return fetchJSON<ServiceEdge[]>("/api/service-map");
+}
+
+export function fetchDataSources(): Promise<DataSource[]> {
+  return fetchJSON<DataSource[]>("/api/data-sources");
 }
