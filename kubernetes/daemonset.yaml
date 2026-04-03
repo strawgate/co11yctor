@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: co11yctor
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: co11yctor
+  template:
+    metadata:
+      labels:
+        app: co11yctor
+    spec:
+      hostNetwork: true
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+        - name: co11yctor
+          image: co11yctor:latest
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}

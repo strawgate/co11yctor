@@ -1,0 +1,88 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.119.0
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml
+    command: ["--config", "/etc/otelcol/config.yaml"]
+    ports:
+      - "8080:8080"
+      - "4317:4317"
+      - "4318:4318"
+
+  co11yctor:
+    build: .
+    privileged: true
+    network_mode: "service:otel-collector"
+    depends_on:
+      - otel-collector
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/co11yctor.db
+    command: ["--db", "/data/co11yctor.db", "--port", "8080", "--interface", "eth0", "--verbose"]
+
+  # Collector sidecar that scrapes host metrics and forwards to main collector
+  metrics-collector:
+    image: otel/opentelemetry-collector-contrib:0.119.0
+    volumes:
+      - ./otel-metrics-collector.yaml:/etc/otelcol/config.yaml
+    command: ["--config", "/etc/otelcol/config.yaml"]
+    depends_on:
+      - otel-collector
+
+  # Collector sidecar that generates and forwards log data
+  logs-collector:
+    image: otel/opentelemetry-collector-contrib:0.119.0
+    volumes:
+      - ./otel-logs-collector.yaml:/etc/otelcol/config.yaml
+    command: ["--config", "/etc/otelcol/config.yaml"]
+    depends_on:
+      - otel-collector
+
+  # Continuous trace generation
+  telemetrygen-traces:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.119.0
+    depends_on:
+      - otel-collector
+    command:
+      - traces
+      - --otlp-endpoint=otel-collector:4317
+      - --otlp-insecure
+      - --rate=5
+      - --duration=24h
+      - --service=demo-frontend
+
+  # Continuous metric generation
+  telemetrygen-metrics:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.119.0
+    depends_on:
+      - otel-collector
+    command:
+      - metrics
+      - --otlp-endpoint=otel-collector:4317
+      - --otlp-insecure
+      - --rate=2
+      - --duration=24h
+
+  # Continuous log generation
+  telemetrygen-logs:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.119.0
+    depends_on:
+      - otel-collector
+    command:
+      - logs
+      - --otlp-endpoint=otel-collector:4317
+      - --otlp-insecure
+      - --rate=3
+      - --duration=24h
+
+  # Sample app: Jaeger HotROD (4 microservices generating distributed traces)
+  hotrod:
+    image: jaegertracing/example-hotrod:latest
+    depends_on:
+      - otel-collector
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+    ports:
+      - "8088:8080"
+    command: ["all"]
