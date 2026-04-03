@@ -3,6 +3,7 @@
 #include <linux/pkt_cls.h>
 #include <linux/if_ether.h>
 #include <linux/ip.h>
+#include <linux/in.h>
 #include <linux/tcp.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
@@ -46,13 +47,24 @@ static __always_inline int handle_packet(struct __sk_buff *skb, __u8 direction) 
     if (ip->protocol != IPPROTO_TCP)
         return TC_ACT_OK;
 
-    __u32 ip_hdr_len = ip->ihl * 4;
-    struct tcphdr *tcp = (void *)ip + ip_hdr_len;
-    if ((void *)(tcp + 1) > data_end)
+    // Read IP header length from the ihl field via bpf_skb_load_bytes
+    // to avoid pointer arithmetic with shift operators
+    __u8 ip_byte0;
+    if (bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ip_byte0, 1) < 0)
+        return TC_ACT_OK;
+    __u32 ip_hdr_len = (ip_byte0 & 0x0F) * 4;
+    if (ip_hdr_len < sizeof(struct iphdr) || ip_hdr_len > 60)
         return TC_ACT_OK;
 
-    __u16 sport = bpf_ntohs(tcp->source);
-    __u16 dport = bpf_ntohs(tcp->dest);
+    __u32 tcp_offset = sizeof(struct ethhdr) + ip_hdr_len;
+
+    // Read TCP src/dst ports and data offset via bpf_skb_load_bytes
+    __u8 tcp_hdr[14];
+    if (bpf_skb_load_bytes(skb, tcp_offset, tcp_hdr, sizeof(tcp_hdr)) < 0)
+        return TC_ACT_OK;
+
+    __u16 sport = ((__u16)tcp_hdr[0] << 8) | tcp_hdr[1];
+    __u16 dport = ((__u16)tcp_hdr[2] << 8) | tcp_hdr[3];
 
     if (sport != OTLP_GRPC_PORT && sport != OTLP_HTTP_PORT &&
         dport != OTLP_GRPC_PORT && dport != OTLP_HTTP_PORT)
@@ -60,12 +72,16 @@ static __always_inline int handle_packet(struct __sk_buff *skb, __u8 direction) 
 
     __u8 proto = (sport == OTLP_GRPC_PORT || dport == OTLP_GRPC_PORT) ? 0 : 1;
 
-    __u32 tcp_hdr_len = tcp->doff * 4;
-    void *payload = (void *)tcp + tcp_hdr_len;
-    if (payload >= data_end)
+    // TCP data offset is upper 4 bits of byte 12
+    __u32 tcp_hdr_len = ((tcp_hdr[12] >> 4) & 0x0F) * 4;
+    if (tcp_hdr_len < 20 || tcp_hdr_len > 60)
         return TC_ACT_OK;
 
-    __u32 payload_len = (__u32)(data_end - payload);
+    __u32 payload_offset = tcp_offset + tcp_hdr_len;
+    if (payload_offset >= skb->len)
+        return TC_ACT_OK;
+
+    __u32 payload_len = skb->len - payload_offset;
     if (payload_len == 0)
         return TC_ACT_OK;
 
@@ -85,10 +101,16 @@ static __always_inline int handle_packet(struct __sk_buff *skb, __u8 direction) 
     if (payload_len > MAX_PAYLOAD_SIZE)
         payload_len = MAX_PAYLOAD_SIZE;
 
+    // Verifier needs provable bounds: mask ensures [0, MAX_PAYLOAD_SIZE-1]
+    payload_len &= (MAX_PAYLOAD_SIZE - 1);
+    if (payload_len == 0) {
+        bpf_ringbuf_discard(e, 0);
+        return TC_ACT_OK;
+    }
+
     e->payload_len = payload_len;
 
-    __u32 offset = (__u32)(payload - data);
-    long ret = bpf_skb_load_bytes(skb, offset, e->payload, payload_len);
+    long ret = bpf_skb_load_bytes(skb, payload_offset, e->payload, payload_len);
     if (ret < 0) {
         bpf_ringbuf_discard(e, 0);
         return TC_ACT_OK;

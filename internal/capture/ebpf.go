@@ -34,18 +34,18 @@ func (m *Manager) startEBPF(ctx context.Context) error {
 		log.Printf("Warning: failed to remove memlock: %v", err)
 	}
 
-	objs := otlpCaptureObjects{}
-	if err := loadOtlpCaptureObjects(&objs, nil); err != nil {
+	objs := OtlpCaptureObjects{}
+	if err := LoadOtlpCaptureObjects(&objs, nil); err != nil {
 		if m.verbose {
 			log.Printf("Failed to load eBPF objects: %v, falling back to simulation", err)
 		}
 		go m.generateSimulatedData(ctx)
 		return nil
 	}
-	defer objs.Close()
 
 	iface, err := net.InterfaceByName(m.iface)
 	if err != nil {
+		objs.Close()
 		return fmt.Errorf("interface %s not found: %w", m.iface, err)
 	}
 
@@ -56,8 +56,6 @@ func (m *Manager) startEBPF(ctx context.Context) error {
 	})
 	if err != nil {
 		log.Printf("Failed to attach ingress TC: %v", err)
-	} else {
-		defer ingressLink.Close()
 	}
 
 	egressLink, err := link.AttachTCX(link.TCXOptions{
@@ -67,22 +65,39 @@ func (m *Manager) startEBPF(ctx context.Context) error {
 	})
 	if err != nil {
 		log.Printf("Failed to attach egress TC: %v", err)
-	} else {
-		defer egressLink.Close()
 	}
 
 	rd, err := ringbuf.NewReader(objs.Events)
 	if err != nil {
+		objs.Close()
+		if ingressLink != nil {
+			ingressLink.Close()
+		}
+		if egressLink != nil {
+			egressLink.Close()
+		}
 		return fmt.Errorf("failed to open ring buffer: %w", err)
 	}
-	defer rd.Close()
 
-	go func() {
-		<-ctx.Done()
-		rd.Close()
-	}()
+	log.Printf("eBPF capture active on interface %s", m.iface)
 
+	// Run the reader and cleanup in a goroutine so Start() returns
 	go func() {
+		defer objs.Close()
+		defer rd.Close()
+		if ingressLink != nil {
+			defer ingressLink.Close()
+		}
+		if egressLink != nil {
+			defer egressLink.Close()
+		}
+
+		// Close ring buffer reader when context is cancelled
+		go func() {
+			<-ctx.Done()
+			rd.Close()
+		}()
+
 		for {
 			record, err := rd.Read()
 			if err != nil {
@@ -143,6 +158,5 @@ func (m *Manager) startEBPF(ctx context.Context) error {
 		}
 	}()
 
-	<-ctx.Done()
 	return nil
 }
