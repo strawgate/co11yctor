@@ -15,16 +15,17 @@ export const LogsPage: FunctionComponent<Props> = ({ events }) => {
   const [severityFilter, setSeverityFilter] = useState("");
   const [liveTail, setLiveTail] = useState(false);
 
-  const filter = [
-    serviceFilter ? `service_name = '${serviceFilter}'` : "",
-    severityFilter ? `severity_text = '${severityFilter}'` : "",
-  ]
-    .filter(Boolean)
-    .join(" AND ");
-
-  const { data: storedLogs, isLoading } = useQuery(() => fetchLogs(200, filter), [filter], {
-    refetchInterval: liveTail ? undefined : 10000,
-  });
+  const { data: storedLogs, isLoading } = useQuery(
+    () =>
+      fetchLogs(200, {
+        service: serviceFilter || undefined,
+        severity: severityFilter || undefined,
+      }),
+    [serviceFilter, severityFilter],
+    {
+      refetchInterval: liveTail ? undefined : 10000,
+    },
+  );
 
   // Live logs from websocket
   const liveLogs = events

@@ -9,16 +9,17 @@ export const MetricsPage: FunctionComponent = () => {
   const [serviceFilter, setServiceFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
 
-  const filter = [
-    serviceFilter ? `service_name = '${serviceFilter}'` : "",
-    typeFilter ? `data_type = '${typeFilter}'` : "",
-  ]
-    .filter(Boolean)
-    .join(" AND ");
-
-  const { data: metrics, isLoading } = useQuery(() => fetchMetrics(200, filter), [filter], {
-    refetchInterval: 10000,
-  });
+  const { data: metrics, isLoading } = useQuery(
+    () =>
+      fetchMetrics(200, {
+        service: serviceFilter || undefined,
+        dataType: typeFilter || undefined,
+      }),
+    [serviceFilter, typeFilter],
+    {
+      refetchInterval: 10000,
+    },
+  );
 
   const services = [
     ...new Set((metrics || []).map((m) => m.ServiceName).filter(Boolean)),

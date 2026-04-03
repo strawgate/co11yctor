@@ -11,9 +11,15 @@ async function fetchJSON<T>(url: string): Promise<T> {
 }
 
 // Spans
-export function fetchSpans(limit = 100, filter?: string): Promise<Span[]> {
+export interface SpanQuery {
+  service?: string;
+  traceID?: string;
+}
+
+export function fetchSpans(limit = 100, query: SpanQuery = {}): Promise<Span[]> {
   const params = new URLSearchParams({ limit: String(limit) });
-  if (filter) params.set("filter", filter);
+  if (query.service) params.set("service", query.service);
+  if (query.traceID) params.set("trace_id", query.traceID);
   return fetchJSON<Span[]>(`/api/spans?${params}`);
 }
 
@@ -22,16 +28,28 @@ export function fetchSpansByTraceID(traceID: string): Promise<Span[]> {
 }
 
 // Metrics
-export function fetchMetrics(limit = 100, filter?: string): Promise<Metric[]> {
+export interface MetricQuery {
+  service?: string;
+  dataType?: string;
+}
+
+export function fetchMetrics(limit = 100, query: MetricQuery = {}): Promise<Metric[]> {
   const params = new URLSearchParams({ limit: String(limit) });
-  if (filter) params.set("filter", filter);
+  if (query.service) params.set("service", query.service);
+  if (query.dataType) params.set("data_type", query.dataType);
   return fetchJSON<Metric[]>(`/api/metrics?${params}`);
 }
 
 // Logs
-export function fetchLogs(limit = 100, filter?: string): Promise<LogRecord[]> {
+export interface LogQuery {
+  service?: string;
+  severity?: string;
+}
+
+export function fetchLogs(limit = 100, query: LogQuery = {}): Promise<LogRecord[]> {
   const params = new URLSearchParams({ limit: String(limit) });
-  if (filter) params.set("filter", filter);
+  if (query.service) params.set("service", query.service);
+  if (query.severity) params.set("severity", query.severity);
   return fetchJSON<LogRecord[]>(`/api/logs?${params}`);
 }
 

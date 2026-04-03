@@ -2,7 +2,7 @@ import type { FunctionComponent } from "preact";
 import { fetchStats } from "@/lib/api";
 import { useQuery } from "@/hooks/useQuery";
 import type { TelemetryEvent } from "@/lib/types";
-import { formatDuration, formatTime } from "@/lib/format";
+import { formatDuration } from "@/lib/format";
 import type { Span, LogRecord } from "@/lib/types";
 
 interface Props {

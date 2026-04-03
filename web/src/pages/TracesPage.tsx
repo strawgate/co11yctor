@@ -10,10 +10,13 @@ export const TracesPage: FunctionComponent = () => {
   const [selectedTraceID, setSelectedTraceID] = useState<string | null>(null);
   const [serviceFilter, setServiceFilter] = useState("");
 
-  const filter = serviceFilter ? `service_name = '${serviceFilter}'` : "";
-  const { data: spans, isLoading } = useQuery(() => fetchSpans(200, filter), [filter], {
-    refetchInterval: 10000,
-  });
+  const { data: spans, isLoading } = useQuery(
+    () => fetchSpans(200, { service: serviceFilter || undefined }),
+    [serviceFilter],
+    {
+      refetchInterval: 10000,
+    },
+  );
 
   const { data: traceSpans } = useQuery(
     () => fetchSpansByTraceID(selectedTraceID!),

@@ -1,11 +1,20 @@
 import type { FunctionComponent } from "preact";
-import { fetchServices } from "@/lib/api";
+import { fetchServiceMap, fetchServices } from "@/lib/api";
 import { useQuery } from "@/hooks/useQuery";
 
 export const ServicesPage: FunctionComponent = () => {
   const { data: services, isLoading } = useQuery(() => fetchServices(), [], {
     refetchInterval: 15000,
   });
+  const { data: edges } = useQuery(() => fetchServiceMap(), [], {
+    refetchInterval: 15000,
+  });
+
+  const connectedServices = new Set<string>();
+  for (const edge of edges || []) {
+    connectedServices.add(edge.source);
+    connectedServices.add(edge.target);
+  }
 
   return (
     <div class="p-6 space-y-6">
@@ -16,16 +25,66 @@ export const ServicesPage: FunctionComponent = () => {
         </span>
       </div>
 
-      {/* Service Map placeholder */}
-      <div class="bg-slate-900 rounded-lg border border-slate-800 p-8">
-        <div class="text-center">
-          <div class="text-4xl mb-4">🗺️</div>
-          <h2 class="text-lg font-semibold text-slate-300 mb-2">Service Map</h2>
-          <p class="text-sm text-slate-500 max-w-md mx-auto">
-            The service map shows dependencies between your services based on trace data.
-            As more traces are captured, the map will automatically populate.
-          </p>
+      <div class="bg-slate-900 rounded-lg border border-slate-800 p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-300">Service Map</h2>
+            <p class="text-sm text-slate-500">
+              Dependencies inferred from parent/child spans across traces.
+            </p>
+          </div>
+          <span class="text-xs text-slate-500">{edges?.length ?? 0} edges</span>
         </div>
+
+        {!edges?.length ? (
+          <div class="text-center py-8">
+            <div class="text-4xl mb-4">🗺️</div>
+            <p class="text-sm text-slate-500 max-w-md mx-auto">
+              No cross-service dependencies detected yet.
+            </p>
+          </div>
+        ) : (
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="space-y-3">
+              {(edges || []).map((edge) => (
+                <div
+                  key={`${edge.source}-${edge.target}`}
+                  class="rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="text-sm text-indigo-300 truncate">{edge.source}</div>
+                      <div class="text-xs text-slate-500">calls</div>
+                    </div>
+                    <div class="text-slate-600">→</div>
+                    <div class="min-w-0 text-right">
+                      <div class="text-sm text-cyan-300 truncate">{edge.target}</div>
+                      <div class="text-xs text-slate-500">{edge.count} spans</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div class="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+              <div class="text-xs uppercase tracking-wide text-slate-500 mb-4">Connected services</div>
+              <div class="flex flex-wrap gap-2">
+                {(services || []).map((name) => (
+                  <span
+                    key={name}
+                    class={`rounded-full px-3 py-1 text-sm ${
+                      connectedServices.has(name)
+                        ? "bg-indigo-500/20 text-indigo-300"
+                        : "bg-slate-800 text-slate-400"
+                    }`}
+                  >
+                    {name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Service Grid */}

@@ -37,8 +37,7 @@ export function useQuery<T>(
         setIsLoading(false);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, ...deps]);
+  }, [enabled, queryFn, ...deps]);
 
   useEffect(() => {
     mountedRef.current = true;
