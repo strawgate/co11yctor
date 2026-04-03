@@ -1,0 +1,25 @@
+receivers:
+  hostmetrics:
+    collection_interval: 15s
+    scrapers:
+      cpu:
+      memory:
+      load:
+      network:
+
+processors:
+  batch:
+    timeout: 5s
+
+exporters:
+  otlp:
+    endpoint: otel-collector:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics]
+      processors: [batch]
+      exporters: [otlp]

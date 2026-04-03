@@ -18,6 +18,12 @@ import (
 
 var http2Preface = []byte("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
 
+const (
+	http2FrameHeaderLen = 9
+	http2FrameData      = 0 // DATA frame type
+	grpcFrameHeaderLen  = 5
+)
+
 // Parser parses OTLP payloads.
 type Parser struct{}
 
@@ -31,11 +37,13 @@ func (p *Parser) Parse(payload []byte, srcIP, protoType string, capturedAt time.
 	}
 	result := &ParseResult{}
 
-	if bytes.HasPrefix(payload, http2Preface) || isGRPCFrame(payload) {
+	if bytes.HasPrefix(payload, http2Preface) || isHTTP2Frame(payload) || isGRPCFrame(payload) {
 		if r := p.parseGRPC(payload, srcIP, protoType, capturedAt); r != nil {
 			mergeResults(result, r)
 		}
-		return result
+		if len(result.Spans)+len(result.Metrics)+len(result.Logs) > 0 {
+			return result
+		}
 	}
 
 	if isHTTP1(payload) {
@@ -67,14 +75,34 @@ func (p *Parser) Parse(payload []byte, srcIP, protoType string, capturedAt time.
 }
 
 func isGRPCFrame(payload []byte) bool {
-	if len(payload) < 5 {
+	if len(payload) < grpcFrameHeaderLen {
 		return false
 	}
 	if payload[0] > 1 {
 		return false
 	}
 	msgLen := uint32(payload[1])<<24 | uint32(payload[2])<<16 | uint32(payload[3])<<8 | uint32(payload[4])
-	return msgLen > 0 && int(msgLen) < len(payload)+1024
+	return msgLen > 0 && int(msgLen) <= len(payload)-grpcFrameHeaderLen+1024
+}
+
+// isHTTP2Frame detects HTTP/2 frames by their 9-byte header structure.
+func isHTTP2Frame(payload []byte) bool {
+	if len(payload) < http2FrameHeaderLen {
+		return false
+	}
+	frameType := payload[3]
+	if frameType > 9 { // HTTP/2 defines frame types 0-9
+		return false
+	}
+	frameLen := uint32(payload[0])<<16 | uint32(payload[1])<<8 | uint32(payload[2])
+	if frameLen > 16*1024*1024 { // Max HTTP/2 frame is 16MB
+		return false
+	}
+	// Stream ID high bit must be 0 (reserved)
+	if payload[5]&0x80 != 0 {
+		return false
+	}
+	return true
 }
 
 func isHTTP1(payload []byte) bool {
@@ -108,10 +136,23 @@ func (p *Parser) parseGRPC(payload []byte, srcIP, protoType string, capturedAt t
 		data = data[len(http2Preface):]
 	}
 	result := &ParseResult{}
-	for len(data) >= 5 {
+
+	// Try parsing as HTTP/2 frames (which contain gRPC messages in DATA frames)
+	if isHTTP2Frame(data) {
+		p.parseHTTP2Frames(data, result, srcIP, protoType, capturedAt)
+		if len(result.Spans)+len(result.Metrics)+len(result.Logs) > 0 {
+			return result
+		}
+	}
+
+	// Fallback: try as raw gRPC 5-byte length-prefixed messages
+	for len(data) >= grpcFrameHeaderLen {
+		if data[0] > 1 {
+			break
+		}
 		msgLen := uint32(data[1])<<24 | uint32(data[2])<<16 | uint32(data[3])<<8 | uint32(data[4])
-		data = data[5:]
-		if int(msgLen) > len(data) {
+		data = data[grpcFrameHeaderLen:]
+		if msgLen == 0 || int(msgLen) > len(data) {
 			break
 		}
 		msg := data[:msgLen]
@@ -121,6 +162,55 @@ func (p *Parser) parseGRPC(payload []byte, srcIP, protoType string, capturedAt t
 		}
 	}
 	return result
+}
+
+// parseHTTP2Frames extracts gRPC protobuf messages from HTTP/2 DATA frames.
+func (p *Parser) parseHTTP2Frames(data []byte, result *ParseResult, srcIP, protoType string, capturedAt time.Time) {
+	for len(data) >= http2FrameHeaderLen {
+		frameLen := uint32(data[0])<<16 | uint32(data[1])<<8 | uint32(data[2])
+		frameType := data[3]
+		data = data[http2FrameHeaderLen:]
+
+		if int(frameLen) > len(data) {
+			// Partial frame from TCP fragmentation — try to parse what we have
+			if frameType == http2FrameData && len(data) > 0 {
+				p.extractGRPCFromData(data, result, srcIP, protoType, capturedAt)
+			}
+			break
+		}
+
+		framePayload := data[:frameLen]
+		data = data[frameLen:]
+
+		if frameType == http2FrameData && len(framePayload) > 0 {
+			p.extractGRPCFromData(framePayload, result, srcIP, protoType, capturedAt)
+		}
+	}
+}
+
+// extractGRPCFromData parses gRPC 5-byte framed messages from an HTTP/2 DATA payload.
+func (p *Parser) extractGRPCFromData(data []byte, result *ParseResult, srcIP, protoType string, capturedAt time.Time) {
+	for len(data) >= grpcFrameHeaderLen {
+		if data[0] > 1 { // Compression flag must be 0 or 1
+			break
+		}
+		msgLen := uint32(data[1])<<24 | uint32(data[2])<<16 | uint32(data[3])<<8 | uint32(data[4])
+		data = data[grpcFrameHeaderLen:]
+		if msgLen == 0 || int(msgLen) > len(data) {
+			// Partial message — try parsing what we have if there's enough data
+			if msgLen > 0 && len(data) > 0 {
+				if r := p.parseProtobuf(data, srcIP, protoType, capturedAt); r != nil {
+					mergeResults(result, r)
+				}
+			}
+			break
+		}
+		msg := data[:msgLen]
+		data = data[msgLen:]
+		if r := p.parseProtobuf(msg, srcIP, protoType, capturedAt); r != nil {
+			mergeResults(result, r)
+		}
+	}
 }
 
 func (p *Parser) parseProtobuf(payload []byte, srcIP, protoType string, capturedAt time.Time) *ParseResult {

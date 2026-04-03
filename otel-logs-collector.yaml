@@ -1,0 +1,32 @@
+receivers:
+  # Generate synthetic log entries (Docker Desktop doesn't expose container log files)
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+  filelog/self:
+    include:
+      - /dev/stdin
+    start_at: beginning
+
+processors:
+  batch:
+    timeout: 5s
+  resource:
+    attributes:
+      - key: source
+        value: logs-collector
+        action: upsert
+
+exporters:
+  otlp:
+    endpoint: otel-collector:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlp]
