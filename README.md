@@ -52,8 +52,8 @@ open http://localhost:8080
 
 ```bash
 # Prerequisites: clang, llvm, libbpf-dev
-make generate          # compiles bpf/otlp_capture.c via bpf2go
-make build             # CGO_ENABLED=1 go build ./cmd/co11yctor
+PATH=$HOME/go/bin:$PATH go generate ./internal/capture/...
+CGO_ENABLED=1 go build -o co11yctor ./cmd/co11yctor
 
 sudo ./co11yctor -i eth0 --port 8080
 ```
@@ -189,18 +189,40 @@ eBPF TC hooks can observe all node-level OTLP traffic.
 ## Development
 
 ```bash
-# Run tests (no eBPF required)
-make test
+# Run Go tests (no eBPF required)
+CGO_ENABLED=1 go test -tags nobpf -v ./tests/...
 
 # Build without eBPF
-make build-nobpf
+CGO_ENABLED=1 go build -tags nobpf -o co11yctor ./cmd/co11yctor
 
 # Generate eBPF Go bindings (requires clang)
-make generate
+PATH=$HOME/go/bin:$PATH go generate ./internal/capture/...
 
 # Full build with eBPF
-make build
+CGO_ENABLED=1 go build -o co11yctor ./cmd/co11yctor
 ```
+
+## Testing
+
+```bash
+# Backend tests
+CGO_ENABLED=1 go test -tags nobpf -v ./tests/...
+
+# Frontend checks
+cd web
+npm ci
+npm run typecheck
+npm run lint
+npm run format:check
+npm run build
+
+# Playwright E2E (starts the app in --no-ebpf mode via web/playwright.config.ts)
+npx playwright install --with-deps chromium
+npx playwright test
+```
+
+If you use `just`, the equivalent shortcuts are `just test`, `just web-typecheck`,
+`just lint-web`, `just fmt-check`, `just web-build`, and `just e2e`.
 
 ---
 
